@@ -2,15 +2,17 @@
 
 namespace App\Http\Controllers;
 
+use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
 
 class HomeController extends Controller
 {
     public function home()
     {
+        $auth = Auth::user();
         $data = [
-            'nama_lengkap' => 'Abdullah Ubaid',
+            'auth' => $auth,
         ];
-        return Inertia::render('HomePage', $data);
+        return Inertia::render('App/HomePage', $data);
     }
 }

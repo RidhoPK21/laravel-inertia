@@ -1,10 +1,11 @@
 import React from "react";
-import { Link, usePage } from "@inertiajs/react";
+import { Link, router } from "@inertiajs/react";
 import { Button } from "@/components/ui/button";
 
 export default function AppLayout({ children }) {
-    // Ambil data dari controller Laravel
-    const { nama_lengkap } = usePage().props;
+    const onLogout = () => {
+        router.get("/auth/logout");
+    };
 
     return (
         <div className="min-h-screen bg-background">
@@ -14,11 +15,11 @@ export default function AppLayout({ children }) {
                     <div className="flex h-16 items-center justify-between">
                         <div className="flex items-center space-x-4">
                             <Link href="/" className="text-lg font-bold">
-                                {nama_lengkap}
+                                DelTodos
                             </Link>
                         </div>
-                        <Button variant="outline" size="sm">
-                            Login
+                        <Button variant="outline" size="sm" onClick={onLogout}>
+                            Logout
                         </Button>
                     </div>
                 </div>
