@@ -12,9 +12,18 @@ import {
 import { Input } from "@/components/ui/input";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { useForm, usePage, router, Link } from "@inertiajs/react";
-import { Check, Trash2, Upload, Edit, ArrowLeft, Search } from "lucide-react";
+import {
+    Check,
+    Trash2,
+    Upload,
+    Edit,
+    ArrowLeft,
+    Search,
+    X,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
-import Swal from "sweetalert2"; // Impor SweetAlert2
+import Swal from "sweetalert2";
+import Chart from "react-apexcharts";
 
 // Komponen untuk satu item Todo
 function TodoItem({ todo }) {
@@ -385,7 +394,9 @@ function FilterControls({ filters }) {
                         Belum Selesai
                     </Button>
                     <Button
-                        variant={filter === "finished" ? "default" : "outline"}
+                        variant={
+                            filter === "finished" ? "default" : "outline"
+                        }
                         onClick={() => setFilter("finished")}
                         className="flex-1"
                     >
@@ -397,10 +408,138 @@ function FilterControls({ filters }) {
     );
 }
 
+// --- [PERBAIKAN] Komponen untuk Statistik (ApexCharts) ---
+function TodoStats({ stats }) {
+    // State untuk memastikan chart hanya dirender di client
+    const [isClient, setIsClient] = useState(false);
+    useEffect(() => {
+        setIsClient(true);
+    }, []);
+
+    const { total, finished, unfinished } = stats;
+
+    const chartSeries = [finished, unfinished];
+    const chartOptions = {
+        chart: {
+            type: "donut",
+        },
+        labels: ["Selesai", "Belum Selesai"],
+        colors: ["#22c55e", "#ef4444"], // Hijau (Selesai), Merah (Belum)
+        legend: {
+            position: "bottom",
+            // Setel warna teks legenda agar sesuai dengan tema (jika gelap)
+            labels: {
+                colors: "hsl(var(--foreground))",
+            },
+        },
+        plotOptions: {
+            pie: {
+                donut: {
+                    labels: {
+                        show: true,
+                        total: {
+                            show: true,
+                            label: "Total",
+                            formatter: () => total,
+                        },
+                    },
+                },
+            },
+        },
+        // Atur warna teks di dalam donut
+        dataLabels: {
+            enabled: true,
+            style: {
+                colors: ["#fff", "#fff"], // Teks putih untuk kontras
+            },
+            dropShadow: {
+                enabled: false,
+            },
+            formatter: (val, opts) => {
+                // Tampilkan angka mentah, bukan persentase
+                return opts.w.globals.series[opts.seriesIndex];
+            },
+        },
+    };
+
+    return (
+        // 1. Hapus padding vertikal dari Card utama
+        <Card className="mb-8 py-0"> 
+            {/* 2. Kurangi padding di CardHeader */}
+            <CardHeader className="p-4 pb-4">
+                <CardTitle>Statistik Pekerjaan</CardTitle>
+                <CardDescription>
+                    Statistik keseluruhan dari semua pekerjaan Anda.
+                </CardDescription>
+            </CardHeader>
+            {/* 3. Kurangi padding di CardContent (Stat Box) */}
+            <CardContent className="grid grid-cols-1 gap-4 p-4 pt-0 md:grid-cols-3">
+                {/* Stat Cards */}
+                <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">
+                            Total Pekerjaan
+                        </CardTitle>
+                    </CardHeader>
+                    {/* 4. Kurangi padding di CardContent internal */}
+                    <CardContent className="pt-2">
+                        <div className="text-2xl font-bold">{total}</div>
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">
+                            Selesai
+                        </CardTitle>
+                        <Check className="h-4 w-4 text-green-500" />
+                    </CardHeader>
+                    {/* 4. Kurangi padding di CardContent internal */}
+                    <CardContent className="pt-2">
+                        <div className="text-2xl font-bold">{finished}</div>
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">
+                            Belum Selesai
+                        </CardTitle>
+                        <X className="h-4 w-4 text-red-500" />
+                    </CardHeader>
+                    {/* 4. Kurangi padding di CardContent internal */}
+                    <CardContent className="pt-2">
+                        <div className="text-2xl font-bold">{unfinished}</div>
+                    </CardContent>
+                </Card>
+            </CardContent>
+
+            {/* Area Chart */}
+            {isClient && (
+                // 5. Kurangi padding di CardFooter (Chart)
+                <CardFooter className="p-4 pt-0">
+                    {total > 0 ? (
+                        <div className="w-full">
+                            <Chart
+                                options={chartOptions}
+                                series={chartSeries}
+                                type="donut"
+                                width="100%"
+                            />
+                        </div>
+                    ) : (
+                        <div className="w-full py-10 text-center text-muted-foreground">
+                            Belum ada data untuk ditampilkan di chart.
+                        </div>
+                    )}
+                </CardFooter>
+            )}
+        </Card>
+    );
+}
+
 // Komponen Halaman Utama
 export default function HomePage() {
-    // 'todos' adalah objek paginasi, 'filters' adalah objek search & filter
-    const { auth, todos, filters } = usePage().props;
+    // Ambil semua props
+    const { auth, todos, filters, stats } = usePage().props;
 
     // Form untuk tambah todo baru
     const { data, setData, post, processing, errors, reset } = useForm({
@@ -511,12 +650,17 @@ export default function HomePage() {
                                         className="w-full"
                                         disabled={processing}
                                     >
-                                        {processing ? "Menyimpan..." : "Tambah"}
+                                        {processing
+                                            ? "Menyimpan..."
+                                            : "Tambah"}
                                     </Button>
                                 </FieldGroup>
                             </form>
                         </CardContent>
                     </Card>
+
+                    {/* Statistik */}
+                    <TodoStats stats={stats} />
 
                     {/* FilterControls */}
                     <FilterControls filters={filters} />
@@ -531,8 +675,7 @@ export default function HomePage() {
                             <p className="text-center text-muted-foreground">
                                 {filters.search || filters.filter
                                     ? "Todo tidak ditemukan." // Pesan jika ada filter
-                                    : "Belum ada pekerjaan."}{" "}
-                                {/* Pesan jika kosong */}
+                                    : "Belum ada pekerjaan."} {/* Pesan jika kosong */}
                             </p>
                         )}
                     </div>
