@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react"; // 1. Tambahkan useEffect
 import AppLayout from "@/Layouts/AppLayout";
 import { Button } from "@/components/ui/button";
 import {
@@ -11,12 +11,14 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
-import { useForm, usePage, router } from "@inertiajs/react";
-import { Check, Trash2, Upload, Edit, ArrowLeft } from "lucide-react";
-import { cn } from "@/lib/utils"; // <-- 1. Tambahkan import 'cn'
+import { useForm, usePage, router, Link } from "@inertiajs/react";
+import { Check, Trash2, Upload, Edit, ArrowLeft, Search } from "lucide-react"; // 2. Tambahkan ikon Search
+import { cn } from "@/lib/utils";
 
-// Komponen untuk satu item Todo
+// Komponen TodoItem (TIDAK ADA PERUBAHAN DI SINI)
+// ... (Salin seluruh komponen TodoItem dari kode sebelumnya)
 function TodoItem({ todo }) {
+    // ... (Semua kode di dalam TodoItem tetap sama)
     const [isEditing, setIsEditing] = useState(false);
     const [isExpanded, setIsExpanded] = useState(false);
 
@@ -91,13 +93,10 @@ function TodoItem({ todo }) {
         setIsEditing(true);
     };
 
-    // --- TAMPILAN DETAIL (SAAT isExpanded = true) ---
-    // (Tidak ada perubahan di blok ini)
     if (isExpanded) {
         return (
             <Card className={cn(todo.is_finished ? "bg-muted/50" : "")}>
                 {" "}
-                {/* Pastikan cn dipakai di sini juga */}
                 <CardHeader>
                     <CardTitle>{todo.title}</CardTitle>
                     <CardDescription>Detail Sampul</CardDescription>
@@ -149,15 +148,9 @@ function TodoItem({ todo }) {
             </Card>
         );
     }
-
-    // --- TAMPILAN RINGKAS (SAAT isExpanded = false) ---
     return (
         <Card
-            // 2. Gunakan 'cn' dan override padding vertikal ('py-0')
-            className={cn(
-                "py-0", // <-- Hapus padding vertikal default Card
-                todo.is_finished ? "bg-muted/50" : ""
-            )}
+            className={cn("py-0", todo.is_finished ? "bg-muted/50" : "")}
             onClick={() => {
                 if (!isEditing) {
                     setIsExpanded(true);
@@ -166,14 +159,12 @@ function TodoItem({ todo }) {
         >
             <div
                 className={cn(
-                    // 3. Atur padding vertikal ('py-4') & horizontal ('px-6') di sini
                     "flex items-center justify-between px-6 py-4",
                     !isEditing &&
                         "cursor-pointer transition-colors hover:bg-accent/50"
                 )}
             >
                 {isEditing ? (
-                    // Form Edit
                     <form
                         onSubmit={handleEditSubmit}
                         className="w-full space-y-2"
@@ -221,9 +212,7 @@ function TodoItem({ todo }) {
                         </div>
                     </form>
                 ) : (
-                    // Tampilan Teks & Tombol Aksi
                     <>
-                        {/* Bagian Kiri: Teks */}
                         <div
                             className="flex-1"
                             onClick={(e) => isEditing && stopPropagation(e)}
@@ -243,8 +232,6 @@ function TodoItem({ todo }) {
                                 {todo.description || "Tidak ada deskripsi."}
                             </CardDescription>
                         </div>
-
-                        {/* Bagian Kanan: Tombol Aksi */}
                         <div
                             className="flex shrink-0 items-center gap-2 pl-4"
                             onClick={stopPropagation}
@@ -284,11 +271,79 @@ function TodoItem({ todo }) {
     );
 }
 
-// Komponen Halaman Utama (Tidak ada perubahan di sini)
-export default function HomePage() {
-    // ... (sisa kode sama)
-    const { auth, todos } = usePage().props;
+// 3. Komponen baru untuk Filter
+function FilterControls({ filters }) {
+    // State untuk 'search' (text input)
+    const [search, setSearch] = useState(filters.search || "");
+    // State untuk 'filter' (tombol aktif)
+    const [filter, setFilter] = useState(filters.filter || "all");
 
+    // Kirim request ke server saat state berubah
+    useEffect(() => {
+        // 'data' adalah parameter query yang akan dikirim
+        const data = {};
+        if (search) data.search = search;
+        if (filter !== "all") data.filter = filter;
+
+        // Gunakan router.get untuk mengunjungi ulang halaman dengan query baru
+        router.get(window.location.pathname, data, {
+            preserveState: true, // Jaga state komponen (cth: input text tidak hilang)
+            replace: true, // Ganti history browser agar tombol back berfungsi normal
+            preserveScroll: true, // Jaga posisi scroll
+        });
+    }, [search, filter]); // Effect ini akan berjalan jika 'search' atau 'filter' berubah
+
+    return (
+        <Card className="mb-8">
+            <CardContent className="flex flex-col gap-4 md:flex-row">
+                {/* Input Pencarian */}
+                <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                        type="text"
+                        placeholder="Cari berdasarkan judul atau deskripsi..."
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                        className="pl-10"
+                    />
+                </div>
+                {/* Tombol Filter Status */}
+                <div className="flex shrink-0 gap-2">
+                    <Button
+                        variant={filter === "all" ? "default" : "outline"}
+                        onClick={() => setFilter("all")}
+                        className="flex-1"
+                    >
+                        Semua
+                    </Button>
+                    <Button
+                        variant={
+                            filter === "unfinished" ? "default" : "outline"
+                        }
+                        onClick={() => setFilter("unfinished")}
+                        className="flex-1"
+                    >
+                        Belum Selesai
+                    </Button>
+                    <Button
+                        variant={filter === "finished" ? "default" : "outline"}
+                        onClick={() => setFilter("finished")}
+                        className="flex-1"
+                    >
+                        Selesai
+                    </Button>
+                </div>
+            </CardContent>
+        </Card>
+    );
+}
+
+// Komponen Halaman Utama (Ada PERUBAHAN di sini)
+export default function HomePage() {
+    // 'todos' adalah objek paginasi, 'filters' adalah objek search & filter
+    const { auth, todos, filters } = usePage().props; // 4. Ambil 'filters' dari props
+
+    // Form untuk tambah todo baru (Tidak Berubah)
     const { data, setData, post, processing, errors, reset } = useForm({
         title: "",
         description: "",
@@ -305,7 +360,7 @@ export default function HomePage() {
         <AppLayout>
             <div className="container mx-auto px-4 py-8">
                 <div className="mx-auto max-w-4xl">
-                    {/* Hero Section */}
+                    {/* Hero Section (Tidak Berubah) */}
                     <div className="mb-12 text-center">
                         <h1 className="mb-4 text-4xl font-bold">
                             <span
@@ -320,13 +375,14 @@ export default function HomePage() {
                         </p>
                     </div>
 
-                    {/* Form Tambah Todo */}
+                    {/* Form Tambah Todo (Tidak Berubah) */}
                     <Card className="mb-8">
                         <CardHeader>
                             <CardTitle>Tambah Pekerjaan Baru</CardTitle>
                         </CardHeader>
                         <CardContent>
                             <form onSubmit={handleSubmit}>
+                                {/* ... (Form tambah todo tetap sama) ... */}
                                 <FieldGroup>
                                     <Field>
                                         <FieldLabel htmlFor="title">
@@ -381,18 +437,52 @@ export default function HomePage() {
                         </CardContent>
                     </Card>
 
+                    {/* 5. [FITUR BARU] Tambahkan komponen FilterControls di sini */}
+                    <FilterControls filters={filters} />
+
                     {/* Daftar Todos */}
                     <div className="space-y-4">
-                        {todos.length > 0 ? (
-                            todos.map((todo) => (
+                        {todos.data.length > 0 ? (
+                            todos.data.map((todo) => (
                                 <TodoItem key={todo.id} todo={todo} />
                             ))
                         ) : (
                             <p className="text-center text-muted-foreground">
-                                Belum ada pekerjaan.
+                                {filters.search || filters.filter
+                                    ? "Todo tidak ditemukan." // Pesan jika ada filter
+                                    : "Belum ada pekerjaan."}{" "}
+                                {/* Pesan jika kosong */}
                             </p>
                         )}
                     </div>
+
+                    {/* Paginasi (Tidak Berubah) */}
+                    {todos.links.length > 3 && (
+                        <div className="mt-8 flex justify-center space-x-1">
+                            {todos.links.map((link, index) => (
+                                <Link
+                                    key={index}
+                                    href={link.url || "#"}
+                                    preserveScroll
+                                    className={cn(
+                                        "inline-block rounded-md px-3 py-2 text-sm",
+                                        link.active
+                                            ? "bg-primary text-primary-foreground"
+                                            : "bg-card hover:bg-accent",
+                                        !link.url
+                                            ? "cursor-not-allowed bg-muted text-muted-foreground"
+                                            : "border"
+                                    )}
+                                    dangerouslySetInnerHTML={{
+                                        __html: link.label,
+                                    }}
+                                    onClick={(e) =>
+                                        !link.url && e.preventDefault()
+                                    }
+                                />
+                            ))}
+                        </div>
+                    )}
                 </div>
             </div>
         </AppLayout>
