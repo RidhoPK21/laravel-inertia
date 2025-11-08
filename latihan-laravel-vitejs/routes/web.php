@@ -3,6 +3,7 @@
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\HomeController;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\TodoController; // <-- Tambahkan ini
 
 Route::middleware(['handle.inertia'])->group(function () {
     // Auth Routes
@@ -18,5 +19,14 @@ Route::middleware(['handle.inertia'])->group(function () {
 
     Route::group(['middleware' => 'check.auth'], function () {
         Route::get('/', [HomeController::class, 'home'])->name('home');
+
+        // --- Tambahkan Route untuk Todos ---
+        Route::resource('todos', TodoController::class)->only([
+            'store', 'update', 'destroy'
+        ]);
+        
+        // Route khusus untuk update cover
+        Route::post('/todos/{todo}/cover', [TodoController::class, 'updateCover'])->name('todos.updateCover');
+        // ---------------------------------
     });
 });
