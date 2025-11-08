@@ -1,4 +1,4 @@
-import React, { useState } from "react"; // <-- Tambahkan useState
+import React, { useState } from "react";
 import AppLayout from "@/Layouts/AppLayout";
 import { Button } from "@/components/ui/button";
 import {
@@ -12,78 +12,173 @@ import {
 import { Input } from "@/components/ui/input";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { useForm, usePage, router } from "@inertiajs/react";
-import { Check, Trash2, Upload, Edit } from "lucide-react"; // <-- Tambahkan Edit ikon
+import { Check, Trash2, Upload, Edit, ArrowLeft } from "lucide-react";
+import { cn } from "@/lib/utils"; // <-- 1. Tambahkan import 'cn'
 
 // Komponen untuk satu item Todo
 function TodoItem({ todo }) {
-    // State untuk mengontrol mode edit
     const [isEditing, setIsEditing] = useState(false);
+    const [isExpanded, setIsExpanded] = useState(false);
 
-    // Form untuk update judul dan deskripsi (menggunakan useForm Inersia)
     const {
         data: editData,
         setData: setEditData,
-        patch: patchTodo, // Menggunakan patch untuk update sebagian
+        patch: patchTodo,
         processing: processingEdit,
         errors: editErrors,
+        reset: resetEditForm,
     } = useForm({
         title: todo.title,
         description: todo.description,
     });
 
-    // Form untuk update cover
     const {
         data: coverData,
         setData: setCoverData,
         post: postCover,
         processing: processingCover,
         errors: coverErrors,
+        reset: resetCoverForm,
     } = useForm({
         cover: null,
     });
 
-    // Fungsi untuk mengubah status selesai/belum selesai
-    const handleToggleFinished = () => {
+    const stopPropagation = (e) => e.stopPropagation();
+
+    const handleToggleFinished = (e) => {
+        stopPropagation(e);
         router.patch(
             `/todos/${todo.id}`,
             {
                 is_finished: !todo.is_finished,
             },
-            {
-                preserveScroll: true,
-            }
+            { preserveScroll: true }
         );
     };
 
-    // Fungsi untuk menghapus todo
-    const handleDelete = () => {
+    const handleDelete = (e) => {
+        stopPropagation(e);
         if (confirm("Apakah Anda yakin ingin menghapus todo ini?")) {
             router.delete(`/todos/${todo.id}`);
         }
     };
 
-    // Handler untuk submit cover
     const handleCoverSubmit = (e) => {
         e.preventDefault();
         postCover(`/todos/${todo.id}/cover`, {
             preserveScroll: true,
+            onSuccess: () => resetCoverForm("cover"),
         });
     };
 
-    // Handler untuk menyimpan perubahan judul/deskripsi
     const handleEditSubmit = (e) => {
         e.preventDefault();
+        stopPropagation(e);
         patchTodo(`/todos/${todo.id}`, {
-            onSuccess: () => setIsEditing(false), // Keluar dari mode edit setelah berhasil
+            onSuccess: () => setIsEditing(false),
             preserveScroll: true,
         });
     };
 
+    const handleCancelEdit = (e) => {
+        stopPropagation(e);
+        setIsEditing(false);
+        resetEditForm();
+    };
+
+    const handleEditClick = (e) => {
+        stopPropagation(e);
+        setIsEditing(true);
+    };
+
+    // --- TAMPILAN DETAIL (SAAT isExpanded = true) ---
+    // (Tidak ada perubahan di blok ini)
+    if (isExpanded) {
+        return (
+            <Card className={cn(todo.is_finished ? "bg-muted/50" : "")}>
+                {" "}
+                {/* Pastikan cn dipakai di sini juga */}
+                <CardHeader>
+                    <CardTitle>{todo.title}</CardTitle>
+                    <CardDescription>Detail Sampul</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    {todo.cover ? (
+                        <img
+                            src={`/storage/${todo.cover}`}
+                            alt="Todo Cover"
+                            className="mb-4 h-48 w-full rounded-md object-cover"
+                        />
+                    ) : (
+                        <div className="mb-4 flex h-48 w-full items-center justify-center rounded-md border border-dashed text-muted-foreground">
+                            Belum ada sampul.
+                        </div>
+                    )}
+                    <form onSubmit={handleCoverSubmit} className="flex gap-2">
+                        <Input
+                            type="file"
+                            onChange={(e) =>
+                                setCoverData("cover", e.target.files[0])
+                            }
+                        />
+                        <Button
+                            type="submit"
+                            size="icon"
+                            variant="outline"
+                            disabled={processingCover}
+                        >
+                            <Upload className="h-4 w-4" />
+                        </Button>
+                    </form>
+                    {coverErrors.cover && (
+                        <div className="mt-1 text-sm text-red-600">
+                            {coverErrors.cover}
+                        </div>
+                    )}
+                </CardContent>
+                <CardFooter className="flex justify-start">
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setIsExpanded(false)}
+                    >
+                        <ArrowLeft className="mr-2 h-4 w-4" />
+                        Kembali
+                    </Button>
+                </CardFooter>
+            </Card>
+        );
+    }
+
+    // --- TAMPILAN RINGKAS (SAAT isExpanded = false) ---
     return (
-        <Card className={todo.is_finished ? "bg-muted/50" : ""}>
-            <CardHeader>
+        <Card
+            // 2. Gunakan 'cn' dan override padding vertikal ('py-0')
+            className={cn(
+                "py-0", // <-- Hapus padding vertikal default Card
+                todo.is_finished ? "bg-muted/50" : ""
+            )}
+            onClick={() => {
+                if (!isEditing) {
+                    setIsExpanded(true);
+                }
+            }}
+        >
+            <div
+                className={cn(
+                    // 3. Atur padding vertikal ('py-4') & horizontal ('px-6') di sini
+                    "flex items-center justify-between px-6 py-4",
+                    !isEditing &&
+                        "cursor-pointer transition-colors hover:bg-accent/50"
+                )}
+            >
                 {isEditing ? (
-                    <form onSubmit={handleEditSubmit} className="space-y-2">
+                    // Form Edit
+                    <form
+                        onSubmit={handleEditSubmit}
+                        className="w-full space-y-2"
+                        onClick={stopPropagation}
+                    >
                         <Input
                             type="text"
                             value={editData.title}
@@ -116,14 +211,7 @@ function TodoItem({ todo }) {
                             <Button
                                 type="button"
                                 variant="outline"
-                                onClick={() => {
-                                    setIsEditing(false); // Batalkan edit
-                                    setEditData({
-                                        // Reset form ke nilai asli
-                                        title: todo.title,
-                                        description: todo.description,
-                                    });
-                                }}
+                                onClick={handleCancelEdit}
                             >
                                 Batal
                             </Button>
@@ -133,88 +221,74 @@ function TodoItem({ todo }) {
                         </div>
                     </form>
                 ) : (
+                    // Tampilan Teks & Tombol Aksi
                     <>
-                        <CardTitle
-                            className={todo.is_finished ? "line-through" : ""}
+                        {/* Bagian Kiri: Teks */}
+                        <div
+                            className="flex-1"
+                            onClick={(e) => isEditing && stopPropagation(e)}
                         >
-                            {todo.title}
-                        </CardTitle>
-                        <CardDescription
-                            className={todo.is_finished ? "line-through" : ""}
+                            <CardTitle
+                                className={
+                                    todo.is_finished ? "line-through" : ""
+                                }
+                            >
+                                {todo.title}
+                            </CardTitle>
+                            <CardDescription
+                                className={
+                                    todo.is_finished ? "line-through" : ""
+                                }
+                            >
+                                {todo.description || "Tidak ada deskripsi."}
+                            </CardDescription>
+                        </div>
+
+                        {/* Bagian Kanan: Tombol Aksi */}
+                        <div
+                            className="flex shrink-0 items-center gap-2 pl-4"
+                            onClick={stopPropagation}
                         >
-                            {todo.description || "Tidak ada deskripsi."}
-                        </CardDescription>
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={handleEditClick}
+                                title="Edit Judul & Deskripsi"
+                            >
+                                <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button
+                                variant={
+                                    todo.is_finished ? "default" : "outline"
+                                }
+                                size="sm"
+                                onClick={handleToggleFinished}
+                            >
+                                <Check className="mr-2 h-4 w-4" />
+                                {todo.is_finished
+                                    ? "Selesai"
+                                    : "Tandai Selesai"}
+                            </Button>
+                            <Button
+                                variant="destructive"
+                                size="icon"
+                                onClick={handleDelete}
+                            >
+                                <Trash2 className="h-4 w-4" />
+                            </Button>
+                        </div>
                     </>
                 )}
-            </CardHeader>
-            <CardContent>
-                {todo.cover && (
-                    <img
-                        src={`/storage/${todo.cover}`}
-                        alt="Todo Cover"
-                        className="mb-4 h-48 w-full rounded-md object-cover"
-                    />
-                )}
-
-                <form onSubmit={handleCoverSubmit} className="flex gap-2">
-                    <Input
-                        type="file"
-                        onChange={(e) =>
-                            setCoverData("cover", e.target.files[0])
-                        }
-                    />
-                    <Button
-                        type="submit"
-                        size="icon"
-                        variant="outline"
-                        disabled={processingCover}
-                    >
-                        <Upload className="h-4 w-4" />
-                    </Button>
-                </form>
-                {coverErrors.cover && (
-                    <div className="mt-1 text-sm text-red-600">
-                        {coverErrors.cover}
-                    </div>
-                )}
-            </CardContent>
-            <CardFooter className="flex justify-end gap-2">
-                {!isEditing && ( // Tombol edit hanya muncul saat tidak dalam mode edit
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => setIsEditing(true)}
-                        title="Edit Judul & Deskripsi"
-                    >
-                        <Edit className="h-4 w-4" />
-                    </Button>
-                )}
-                <Button
-                    variant={todo.is_finished ? "default" : "outline"}
-                    size="sm"
-                    onClick={handleToggleFinished}
-                >
-                    <Check className="mr-2 h-4 w-4" />
-                    {todo.is_finished ? "Selesai" : "Tandai Selesai"}
-                </Button>
-                <Button
-                    variant="destructive"
-                    size="icon"
-                    onClick={handleDelete}
-                >
-                    <Trash2 className="h-4 w-4" />
-                </Button>
-            </CardFooter>
+            </div>
         </Card>
     );
 }
 
 // Komponen Halaman Utama (Tidak ada perubahan di sini)
 export default function HomePage() {
-    // Ambil props 'auth' dan 'todos' yang dikirim dari HomeController
+    // ... (sisa kode sama)
     const { auth, todos } = usePage().props;
 
-    // Form untuk membuat todo baru
     const { data, setData, post, processing, errors, reset } = useForm({
         title: "",
         description: "",
@@ -223,7 +297,7 @@ export default function HomePage() {
     const handleSubmit = (e) => {
         e.preventDefault();
         post("/todos", {
-            onSuccess: () => reset(), // Reset form setelah berhasil
+            onSuccess: () => reset(),
         });
     };
 
