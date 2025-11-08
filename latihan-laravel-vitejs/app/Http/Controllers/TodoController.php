@@ -25,7 +25,8 @@ class TodoController extends Controller
             'description' => $request->description,
         ]);
 
-        return redirect()->route('home')->with('success', 'Todo berhasil ditambahkan!');
+        // [DIHAPUS] ->with('success', 'Todo berhasil ditambahkan!')
+        return redirect()->route('home');
     }
 
     /**
@@ -46,7 +47,7 @@ class TodoController extends Controller
 
         $todo->update($request->all());
 
-        return back();
+        return back(); // (Tidak ada perubahan di sini, sudah benar)
     }
 
     /**
@@ -66,7 +67,8 @@ class TodoController extends Controller
 
         $todo->delete();
 
-        return redirect()->route('home')->with('success', 'Todo berhasil dihapus!');
+        // [DIHAPUS] ->with('success', 'Todo berhasil dihapus!')
+        return redirect()->route('home');
     }
 
     /**
@@ -95,6 +97,7 @@ class TodoController extends Controller
             'cover' => $path,
         ]);
 
-        return back()->with('success', 'Cover berhasil diupdate!');
+        // [DIHAPUS] ->with('success', 'Cover berhasil diupdate!')
+        return back();
     }
 }

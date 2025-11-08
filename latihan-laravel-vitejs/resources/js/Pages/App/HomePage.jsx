@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react"; // 1. Tambahkan useEffect
+import React, { useState, useEffect } from "react";
 import AppLayout from "@/Layouts/AppLayout";
 import { Button } from "@/components/ui/button";
 import {
@@ -12,16 +12,18 @@ import {
 import { Input } from "@/components/ui/input";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { useForm, usePage, router, Link } from "@inertiajs/react";
-import { Check, Trash2, Upload, Edit, ArrowLeft, Search } from "lucide-react"; // 2. Tambahkan ikon Search
+import { Check, Trash2, Upload, Edit, ArrowLeft, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
+import Swal from "sweetalert2"; // Impor SweetAlert2
 
-// Komponen TodoItem (TIDAK ADA PERUBAHAN DI SINI)
-// ... (Salin seluruh komponen TodoItem dari kode sebelumnya)
+// Komponen untuk satu item Todo
 function TodoItem({ todo }) {
-    // ... (Semua kode di dalam TodoItem tetap sama)
+    // State untuk mengontrol mode edit judul/deskripsi
     const [isEditing, setIsEditing] = useState(false);
+    // State untuk mengontrol mode detail/cover (Tampilan Awal vs Tampilan Detail)
     const [isExpanded, setIsExpanded] = useState(false);
 
+    // Form untuk update judul dan deskripsi
     const {
         data: editData,
         setData: setEditData,
@@ -34,6 +36,7 @@ function TodoItem({ todo }) {
         description: todo.description,
     });
 
+    // Form untuk update cover
     const {
         data: coverData,
         setData: setCoverData,
@@ -45,10 +48,12 @@ function TodoItem({ todo }) {
         cover: null,
     });
 
+    // --- Helper Handlers untuk Stop Propagasi ---
     const stopPropagation = (e) => e.stopPropagation();
 
+    // --- Handlers Aksi ---
     const handleToggleFinished = (e) => {
-        stopPropagation(e);
+        stopPropagation(e); // Hentikan event bubble
         router.patch(
             `/todos/${todo.id}`,
             {
@@ -59,44 +64,90 @@ function TodoItem({ todo }) {
     };
 
     const handleDelete = (e) => {
-        stopPropagation(e);
-        if (confirm("Apakah Anda yakin ingin menghapus todo ini?")) {
-            router.delete(`/todos/${todo.id}`);
-        }
+        stopPropagation(e); // Hentikan event bubble
+
+        Swal.fire({
+            title: "Anda yakin?",
+            text: "Todo yang sudah dihapus tidak dapat dikembalikan!",
+            icon: "warning",
+            showCancelButton: true,
+            confirmButtonColor: "#3085d6",
+            cancelButtonColor: "#d33",
+            confirmButtonText: "Ya, hapus!",
+            cancelButtonText: "Batal",
+        }).then((result) => {
+            if (result.isConfirmed) {
+                // Kirim request hapus
+                router.delete(`/todos/${todo.id}`, {
+                    // Tampilkan notifikasi sukses setelah hapus
+                    onSuccess: () => {
+                        Swal.fire({
+                            title: "Berhasil!",
+                            text: "Todo telah dihapus.",
+                            icon: "success",
+                            timer: 2000,
+                            showConfirmButton: false,
+                        });
+                    },
+                });
+            }
+        });
     };
 
     const handleCoverSubmit = (e) => {
         e.preventDefault();
         postCover(`/todos/${todo.id}/cover`, {
             preserveScroll: true,
-            onSuccess: () => resetCoverForm("cover"),
+            onSuccess: () => {
+                resetCoverForm("cover");
+                // Tampilkan toast sukses
+                Swal.fire({
+                    toast: true,
+                    position: "top-end",
+                    icon: "success",
+                    title: "Cover berhasil diupdate!",
+                    showConfirmButton: false,
+                    timer: 3000,
+                });
+            },
         });
     };
 
     const handleEditSubmit = (e) => {
         e.preventDefault();
-        stopPropagation(e);
+        stopPropagation(e); // Hentikan event bubble
         patchTodo(`/todos/${todo.id}`, {
-            onSuccess: () => setIsEditing(false),
+            onSuccess: () => {
+                setIsEditing(false);
+                // Tampilkan toast sukses
+                Swal.fire({
+                    toast: true,
+                    position: "top-end",
+                    icon: "success",
+                    title: "Todo berhasil diupdate!",
+                    showConfirmButton: false,
+                    timer: 3000,
+                });
+            },
             preserveScroll: true,
         });
     };
 
     const handleCancelEdit = (e) => {
-        stopPropagation(e);
+        stopPropagation(e); // Hentikan event bubble
         setIsEditing(false);
         resetEditForm();
     };
 
     const handleEditClick = (e) => {
-        stopPropagation(e);
+        stopPropagation(e); // Hentikan event bubble
         setIsEditing(true);
     };
 
+    // --- TAMPILAN DETAIL (SAAT isExpanded = true) ---
     if (isExpanded) {
         return (
             <Card className={cn(todo.is_finished ? "bg-muted/50" : "")}>
-                {" "}
                 <CardHeader>
                     <CardTitle>{todo.title}</CardTitle>
                     <CardDescription>Detail Sampul</CardDescription>
@@ -139,7 +190,7 @@ function TodoItem({ todo }) {
                     <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => setIsExpanded(false)}
+                        onClick={() => setIsExpanded(false)} // Tombol Kembali
                     >
                         <ArrowLeft className="mr-2 h-4 w-4" />
                         Kembali
@@ -148,10 +199,13 @@ function TodoItem({ todo }) {
             </Card>
         );
     }
+
+    // --- TAMPILAN RINGKAS (SAAT isExpanded = false) ---
     return (
         <Card
             className={cn("py-0", todo.is_finished ? "bg-muted/50" : "")}
             onClick={() => {
+                // Hanya bisa expand jika tidak sedang mode edit judul
                 if (!isEditing) {
                     setIsExpanded(true);
                 }
@@ -165,10 +219,11 @@ function TodoItem({ todo }) {
                 )}
             >
                 {isEditing ? (
+                    // Form Edit Judul & Deskripsi
                     <form
                         onSubmit={handleEditSubmit}
                         className="w-full space-y-2"
-                        onClick={stopPropagation}
+                        onClick={stopPropagation} // Hentikan bubble di form
                     >
                         <Input
                             type="text"
@@ -212,7 +267,9 @@ function TodoItem({ todo }) {
                         </div>
                     </form>
                 ) : (
+                    // Tampilan Teks Judul & Deskripsi
                     <>
+                        {/* Bagian Kiri: Teks */}
                         <div
                             className="flex-1"
                             onClick={(e) => isEditing && stopPropagation(e)}
@@ -232,6 +289,8 @@ function TodoItem({ todo }) {
                                 {todo.description || "Tidak ada deskripsi."}
                             </CardDescription>
                         </div>
+
+                        {/* Bagian Kanan: Tombol Aksi */}
                         <div
                             className="flex shrink-0 items-center gap-2 pl-4"
                             onClick={stopPropagation}
@@ -239,7 +298,7 @@ function TodoItem({ todo }) {
                             <Button
                                 variant="ghost"
                                 size="icon"
-                                onClick={handleEditClick}
+                                onClick={handleEditClick} // Handler ini sudah ada stopPropagation
                                 title="Edit Judul & Deskripsi"
                             >
                                 <Edit className="h-4 w-4" />
@@ -249,7 +308,7 @@ function TodoItem({ todo }) {
                                     todo.is_finished ? "default" : "outline"
                                 }
                                 size="sm"
-                                onClick={handleToggleFinished}
+                                onClick={handleToggleFinished} // Handler ini sudah ada stopPropagation
                             >
                                 <Check className="mr-2 h-4 w-4" />
                                 {todo.is_finished
@@ -259,7 +318,7 @@ function TodoItem({ todo }) {
                             <Button
                                 variant="destructive"
                                 size="icon"
-                                onClick={handleDelete}
+                                onClick={handleDelete} // Handler ini sudah ada stopPropagation
                             >
                                 <Trash2 className="h-4 w-4" />
                             </Button>
@@ -271,7 +330,7 @@ function TodoItem({ todo }) {
     );
 }
 
-// 3. Komponen baru untuk Filter
+// Komponen untuk Filter dan Pencarian
 function FilterControls({ filters }) {
     // State untuk 'search' (text input)
     const [search, setSearch] = useState(filters.search || "");
@@ -294,8 +353,8 @@ function FilterControls({ filters }) {
     }, [search, filter]); // Effect ini akan berjalan jika 'search' atau 'filter' berubah
 
     return (
-        <Card className="mb-8">
-            <CardContent className="flex flex-col gap-4 md:flex-row">
+        <Card className="mb-8 py-0">
+            <CardContent className="flex flex-col gap-4 p-4 md:flex-row md:items-center">
                 {/* Input Pencarian */}
                 <div className="relative flex-1">
                     <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -338,12 +397,12 @@ function FilterControls({ filters }) {
     );
 }
 
-// Komponen Halaman Utama (Ada PERUBAHAN di sini)
+// Komponen Halaman Utama
 export default function HomePage() {
     // 'todos' adalah objek paginasi, 'filters' adalah objek search & filter
-    const { auth, todos, filters } = usePage().props; // 4. Ambil 'filters' dari props
+    const { auth, todos, filters } = usePage().props;
 
-    // Form untuk tambah todo baru (Tidak Berubah)
+    // Form untuk tambah todo baru
     const { data, setData, post, processing, errors, reset } = useForm({
         title: "",
         description: "",
@@ -352,7 +411,30 @@ export default function HomePage() {
     const handleSubmit = (e) => {
         e.preventDefault();
         post("/todos", {
-            onSuccess: () => reset(),
+            onSuccess: () => {
+                reset();
+                // Tampilkan toast sukses
+                Swal.fire({
+                    toast: true,
+                    position: "top-end",
+                    icon: "success",
+                    title: "Todo baru berhasil ditambahkan!",
+                    showConfirmButton: false,
+                    timer: 3000,
+                });
+            },
+            onError: (errors) => {
+                if (errors.title || errors.description) {
+                    Swal.fire({
+                        toast: true,
+                        position: "top-end",
+                        icon: "error",
+                        title: "Periksa kembali form Anda.",
+                        showConfirmButton: false,
+                        timer: 3000,
+                    });
+                }
+            },
         });
     };
 
@@ -360,7 +442,7 @@ export default function HomePage() {
         <AppLayout>
             <div className="container mx-auto px-4 py-8">
                 <div className="mx-auto max-w-4xl">
-                    {/* Hero Section (Tidak Berubah) */}
+                    {/* Hero Section */}
                     <div className="mb-12 text-center">
                         <h1 className="mb-4 text-4xl font-bold">
                             <span
@@ -375,14 +457,13 @@ export default function HomePage() {
                         </p>
                     </div>
 
-                    {/* Form Tambah Todo (Tidak Berubah) */}
+                    {/* Form Tambah Todo */}
                     <Card className="mb-8">
                         <CardHeader>
                             <CardTitle>Tambah Pekerjaan Baru</CardTitle>
                         </CardHeader>
                         <CardContent>
                             <form onSubmit={handleSubmit}>
-                                {/* ... (Form tambah todo tetap sama) ... */}
                                 <FieldGroup>
                                     <Field>
                                         <FieldLabel htmlFor="title">
@@ -437,7 +518,7 @@ export default function HomePage() {
                         </CardContent>
                     </Card>
 
-                    {/* 5. [FITUR BARU] Tambahkan komponen FilterControls di sini */}
+                    {/* FilterControls */}
                     <FilterControls filters={filters} />
 
                     {/* Daftar Todos */}
@@ -456,8 +537,8 @@ export default function HomePage() {
                         )}
                     </div>
 
-                    {/* Paginasi (Tidak Berubah) */}
-                    {todos.links.length > 3 && (
+                    {/* Paginasi */}
+                    {todos.links.length > 3 && ( // Hanya tampilkan jika ada halaman lain
                         <div className="mt-8 flex justify-center space-x-1">
                             {todos.links.map((link, index) => (
                                 <Link
