@@ -20,10 +20,13 @@ import {
     ArrowLeft,
     Search,
     X,
-} from "lucide-react";
+} from "lucide-react"; // <-- PERBAIKAN: Menambahkan 'from "lucide-react";'
 import { cn } from "@/lib/utils";
 import Swal from "sweetalert2";
 import Chart from "react-apexcharts";
+
+// Pastikan file ini sudah Anda buat di resources/js/Components/TrixEditor.jsx
+import TrixEditor from "@/Components/TrixEditor";
 
 // Komponen untuk satu item Todo
 function TodoItem({ todo }) {
@@ -33,6 +36,7 @@ function TodoItem({ todo }) {
     const [isExpanded, setIsExpanded] = useState(false);
 
     // Form untuk update judul dan deskripsi
+    // Menggunakan PATCH asli karena tidak ada file upload (Trix menangani file di form ini sebagai HTML)
     const {
         data: editData,
         setData: setEditData,
@@ -42,7 +46,7 @@ function TodoItem({ todo }) {
         reset: resetEditForm,
     } = useForm({
         title: todo.title,
-        description: todo.description,
+        description: todo.description || "", // Pastikan nilai awal tidak null
     });
 
     // Form untuk update cover
@@ -57,12 +61,29 @@ function TodoItem({ todo }) {
         cover: null,
     });
 
-    // --- Helper Handlers untuk Stop Propagasi ---
+    // --- Helper Handlers ---
     const stopPropagation = (e) => e.stopPropagation();
+
+    // Fungsi utilitas untuk membersihkan HTML dan membuat snippet
+    const getSnippet = (htmlString) => {
+        if (!htmlString || htmlString.trim() === "") {
+            return "Tidak ada deskripsi.";
+        }
+        // 1. Hilangkan semua tag HTML (termasuk tag <p>)
+        const plainText = htmlString.replace(/<[^>]*>?/gm, "");
+        // 2. Jika setelah dibersihkan teksnya kosong (misal hanya berisi <img>), kembalikan default
+        if (plainText.trim() === "") {
+            return "(Deskripsi hanya berisi gambar/media.)";
+        }
+        // 3. Potong 100 karakter pertama
+        return (
+            plainText.substring(0, 100) + (plainText.length > 100 ? "..." : "")
+        );
+    };
 
     // --- Handlers Aksi ---
     const handleToggleFinished = (e) => {
-        stopPropagation(e); // Hentikan event bubble
+        stopPropagation(e);
         router.patch(
             `/todos/${todo.id}`,
             {
@@ -73,7 +94,7 @@ function TodoItem({ todo }) {
     };
 
     const handleDelete = (e) => {
-        stopPropagation(e); // Hentikan event bubble
+        stopPropagation(e);
 
         Swal.fire({
             title: "Anda yakin?",
@@ -86,9 +107,7 @@ function TodoItem({ todo }) {
             cancelButtonText: "Batal",
         }).then((result) => {
             if (result.isConfirmed) {
-                // Kirim request hapus
                 router.delete(`/todos/${todo.id}`, {
-                    // Tampilkan notifikasi sukses setelah hapus
                     onSuccess: () => {
                         Swal.fire({
                             title: "Berhasil!",
@@ -109,7 +128,6 @@ function TodoItem({ todo }) {
             preserveScroll: true,
             onSuccess: () => {
                 resetCoverForm("cover");
-                // Tampilkan toast sukses
                 Swal.fire({
                     toast: true,
                     position: "top-end",
@@ -124,11 +142,12 @@ function TodoItem({ todo }) {
 
     const handleEditSubmit = (e) => {
         e.preventDefault();
-        stopPropagation(e); // Hentikan event bubble
+        stopPropagation(e);
+
+        // Menggunakan patchTodo (PATCH) karena tidak ada file upload terpisah
         patchTodo(`/todos/${todo.id}`, {
             onSuccess: () => {
                 setIsEditing(false);
-                // Tampilkan toast sukses
                 Swal.fire({
                     toast: true,
                     position: "top-end",
@@ -143,13 +162,13 @@ function TodoItem({ todo }) {
     };
 
     const handleCancelEdit = (e) => {
-        stopPropagation(e); // Hentikan event bubble
+        stopPropagation(e);
         setIsEditing(false);
         resetEditForm();
     };
 
     const handleEditClick = (e) => {
-        stopPropagation(e); // Hentikan event bubble
+        stopPropagation(e);
         setIsEditing(true);
     };
 
@@ -162,6 +181,7 @@ function TodoItem({ todo }) {
                     <CardDescription>Detail Sampul</CardDescription>
                 </CardHeader>
                 <CardContent>
+                    {/* Tampilan Cover */}
                     {todo.cover ? (
                         <img
                             src={`/storage/${todo.cover}`}
@@ -173,6 +193,7 @@ function TodoItem({ todo }) {
                             Belum ada sampul.
                         </div>
                     )}
+                    {/* Form Update Cover */}
                     <form onSubmit={handleCoverSubmit} className="flex gap-2">
                         <Input
                             type="file"
@@ -195,11 +216,27 @@ function TodoItem({ todo }) {
                         </div>
                     )}
                 </CardContent>
+
+                {/* TAMPILAN RICH TEXT DESKRIPSI (HTML) */}
+                {todo.description && (
+                    <CardContent className="pt-0">
+                        <h3 className="text-sm font-medium text-muted-foreground mb-1">
+                            Deskripsi Lengkap
+                        </h3>
+                        <div
+                            className="trix-content prose dark:prose-invert max-w-none"
+                            dangerouslySetInnerHTML={{
+                                __html: todo.description,
+                            }}
+                        />
+                    </CardContent>
+                )}
+
                 <CardFooter className="flex justify-start">
                     <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => setIsExpanded(false)} // Tombol Kembali
+                        onClick={() => setIsExpanded(false)}
                     >
                         <ArrowLeft className="mr-2 h-4 w-4" />
                         Kembali
@@ -214,7 +251,6 @@ function TodoItem({ todo }) {
         <Card
             className={cn("py-0", todo.is_finished ? "bg-muted/50" : "")}
             onClick={() => {
-                // Hanya bisa expand jika tidak sedang mode edit judul
                 if (!isEditing) {
                     setIsExpanded(true);
                 }
@@ -232,7 +268,7 @@ function TodoItem({ todo }) {
                     <form
                         onSubmit={handleEditSubmit}
                         className="w-full space-y-2"
-                        onClick={stopPropagation} // Hentikan bubble di form
+                        onClick={stopPropagation}
                     >
                         <Input
                             type="text"
@@ -248,20 +284,22 @@ function TodoItem({ todo }) {
                                 {editErrors.title}
                             </div>
                         )}
-                        <Input
-                            type="text"
+
+                        {/* INPUT DESKRIPSI: TrixEditor */}
+                        <TrixEditor
+                            name={`description-edit-${todo.id}`}
                             value={editData.description || ""}
-                            onChange={(e) =>
-                                setEditData("description", e.target.value)
+                            onChange={(html) =>
+                                setEditData("description", html)
                             }
-                            className="text-muted-foreground"
-                            placeholder="Deskripsi Todo"
+                            placeholder="Deskripsi Todo (Rich Text)"
                         />
                         {editErrors.description && (
                             <div className="text-sm text-red-600">
                                 {editErrors.description}
                             </div>
                         )}
+
                         <div className="flex justify-end gap-2">
                             <Button
                                 type="button"
@@ -276,9 +314,8 @@ function TodoItem({ todo }) {
                         </div>
                     </form>
                 ) : (
-                    // Tampilan Teks Judul & Deskripsi
+                    // Tampilan Teks Judul & Deskripsi (Snippet)
                     <>
-                        {/* Bagian Kiri: Teks */}
                         <div
                             className="flex-1"
                             onClick={(e) => isEditing && stopPropagation(e)}
@@ -295,7 +332,8 @@ function TodoItem({ todo }) {
                                     todo.is_finished ? "line-through" : ""
                                 }
                             >
-                                {todo.description || "Tidak ada deskripsi."}
+                                {/* PERBAIKAN SNIPPET DENGAN FUNGSI getSnippet() */}
+                                {getSnippet(todo.description)}
                             </CardDescription>
                         </div>
 
@@ -307,7 +345,7 @@ function TodoItem({ todo }) {
                             <Button
                                 variant="ghost"
                                 size="icon"
-                                onClick={handleEditClick} // Handler ini sudah ada stopPropagation
+                                onClick={handleEditClick}
                                 title="Edit Judul & Deskripsi"
                             >
                                 <Edit className="h-4 w-4" />
@@ -317,7 +355,7 @@ function TodoItem({ todo }) {
                                     todo.is_finished ? "default" : "outline"
                                 }
                                 size="sm"
-                                onClick={handleToggleFinished} // Handler ini sudah ada stopPropagation
+                                onClick={handleToggleFinished}
                             >
                                 <Check className="mr-2 h-4 w-4" />
                                 {todo.is_finished
@@ -327,7 +365,7 @@ function TodoItem({ todo }) {
                             <Button
                                 variant="destructive"
                                 size="icon"
-                                onClick={handleDelete} // Handler ini sudah ada stopPropagation
+                                onClick={handleDelete}
                             >
                                 <Trash2 className="h-4 w-4" />
                             </Button>
@@ -348,18 +386,16 @@ function FilterControls({ filters }) {
 
     // Kirim request ke server saat state berubah
     useEffect(() => {
-        // 'data' adalah parameter query yang akan dikirim
         const data = {};
         if (search) data.search = search;
         if (filter !== "all") data.filter = filter;
 
-        // Gunakan router.get untuk mengunjungi ulang halaman dengan query baru
         router.get(window.location.pathname, data, {
-            preserveState: true, // Jaga state komponen (cth: input text tidak hilang)
-            replace: true, // Ganti history browser agar tombol back berfungsi normal
-            preserveScroll: true, // Jaga posisi scroll
+            preserveState: true,
+            replace: true,
+            preserveScroll: true,
         });
-    }, [search, filter]); // Effect ini akan berjalan jika 'search' atau 'filter' berubah
+    }, [search, filter]);
 
     return (
         <Card className="mb-8 py-0">
@@ -394,9 +430,7 @@ function FilterControls({ filters }) {
                         Belum Selesai
                     </Button>
                     <Button
-                        variant={
-                            filter === "finished" ? "default" : "outline"
-                        }
+                        variant={filter === "finished" ? "default" : "outline"}
                         onClick={() => setFilter("finished")}
                         className="flex-1"
                     >
@@ -408,9 +442,8 @@ function FilterControls({ filters }) {
     );
 }
 
-// --- [PERBAIKAN] Komponen untuk Statistik (ApexCharts) ---
+// --- Komponen untuk Statistik (ApexCharts) ---
 function TodoStats({ stats }) {
-    // State untuk memastikan chart hanya dirender di client
     const [isClient, setIsClient] = useState(false);
     useEffect(() => {
         setIsClient(true);
@@ -424,10 +457,9 @@ function TodoStats({ stats }) {
             type: "donut",
         },
         labels: ["Selesai", "Belum Selesai"],
-        colors: ["#22c55e", "#ef4444"], // Hijau (Selesai), Merah (Belum)
+        colors: ["#22c55e", "#ef4444"],
         legend: {
             position: "bottom",
-            // Setel warna teks legenda agar sesuai dengan tema (jika gelap)
             labels: {
                 colors: "hsl(var(--foreground))",
             },
@@ -446,42 +478,35 @@ function TodoStats({ stats }) {
                 },
             },
         },
-        // Atur warna teks di dalam donut
         dataLabels: {
             enabled: true,
             style: {
-                colors: ["#fff", "#fff"], // Teks putih untuk kontras
+                colors: ["#fff", "#fff"],
             },
             dropShadow: {
                 enabled: false,
             },
             formatter: (val, opts) => {
-                // Tampilkan angka mentah, bukan persentase
                 return opts.w.globals.series[opts.seriesIndex];
             },
         },
     };
 
     return (
-        // 1. Hapus padding vertikal dari Card utama
-        <Card className="mb-8 py-0"> 
-            {/* 2. Kurangi padding di CardHeader */}
+        <Card className="mb-8 py-0">
             <CardHeader className="p-4 pb-4">
                 <CardTitle>Statistik Pekerjaan</CardTitle>
                 <CardDescription>
                     Statistik keseluruhan dari semua pekerjaan Anda.
                 </CardDescription>
             </CardHeader>
-            {/* 3. Kurangi padding di CardContent (Stat Box) */}
             <CardContent className="grid grid-cols-1 gap-4 p-4 pt-0 md:grid-cols-3">
-                {/* Stat Cards */}
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle className="text-sm font-medium">
                             Total Pekerjaan
                         </CardTitle>
                     </CardHeader>
-                    {/* 4. Kurangi padding di CardContent internal */}
                     <CardContent className="pt-2">
                         <div className="text-2xl font-bold">{total}</div>
                     </CardContent>
@@ -493,7 +518,6 @@ function TodoStats({ stats }) {
                         </CardTitle>
                         <Check className="h-4 w-4 text-green-500" />
                     </CardHeader>
-                    {/* 4. Kurangi padding di CardContent internal */}
                     <CardContent className="pt-2">
                         <div className="text-2xl font-bold">{finished}</div>
                     </CardContent>
@@ -505,7 +529,6 @@ function TodoStats({ stats }) {
                         </CardTitle>
                         <X className="h-4 w-4 text-red-500" />
                     </CardHeader>
-                    {/* 4. Kurangi padding di CardContent internal */}
                     <CardContent className="pt-2">
                         <div className="text-2xl font-bold">{unfinished}</div>
                     </CardContent>
@@ -514,7 +537,6 @@ function TodoStats({ stats }) {
 
             {/* Area Chart */}
             {isClient && (
-                // 5. Kurangi padding di CardFooter (Chart)
                 <CardFooter className="p-4 pt-0">
                     {total > 0 ? (
                         <div className="w-full">
@@ -552,7 +574,6 @@ export default function HomePage() {
         post("/todos", {
             onSuccess: () => {
                 reset();
-                // Tampilkan toast sukses
                 Swal.fire({
                     toast: true,
                     position: "top-end",
@@ -627,17 +648,14 @@ export default function HomePage() {
                                         <FieldLabel htmlFor="description">
                                             Deskripsi (Opsional)
                                         </FieldLabel>
-                                        <Input
-                                            id="description"
-                                            type="text"
-                                            placeholder="Tambahkan detail..."
+                                        {/* GANTI INPUT INI dengan TrixEditor */}
+                                        <TrixEditor
+                                            name="description-add"
                                             value={data.description}
-                                            onChange={(e) =>
-                                                setData(
-                                                    "description",
-                                                    e.target.value
-                                                )
+                                            onChange={(html) =>
+                                                setData("description", html)
                                             }
+                                            placeholder="Tambahkan detail (Rich Text)..."
                                         />
                                         {errors.description && (
                                             <div className="text-sm text-red-600">
@@ -650,9 +668,7 @@ export default function HomePage() {
                                         className="w-full"
                                         disabled={processing}
                                     >
-                                        {processing
-                                            ? "Menyimpan..."
-                                            : "Tambah"}
+                                        {processing ? "Menyimpan..." : "Tambah"}
                                     </Button>
                                 </FieldGroup>
                             </form>
@@ -674,14 +690,14 @@ export default function HomePage() {
                         ) : (
                             <p className="text-center text-muted-foreground">
                                 {filters.search || filters.filter
-                                    ? "Todo tidak ditemukan." // Pesan jika ada filter
-                                    : "Belum ada pekerjaan."} {/* Pesan jika kosong */}
+                                    ? "Todo tidak ditemukan."
+                                    : "Belum ada pekerjaan."}
                             </p>
                         )}
                     </div>
 
                     {/* Paginasi */}
-                    {todos.links.length > 3 && ( // Hanya tampilkan jika ada halaman lain
+                    {todos.links.length > 3 && (
                         <div className="mt-8 flex justify-center space-x-1">
                             {todos.links.map((link, index) => (
                                 <Link

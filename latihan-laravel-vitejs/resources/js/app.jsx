@@ -1,11 +1,12 @@
 import "../css/app.css";
 import "./bootstrap";
-import "sweetalert2/dist/sweetalert2.min.css";
 
 import { createInertiaApp } from "@inertiajs/react";
 import { createRoot } from "react-dom/client";
-import { resolvePageComponent } from "laravel-vite-plugin/inertia-helpers";
 
+// ✨ BARU: Impor CSS dan JS Trix
+import "trix/dist/trix.css";
+import "trix";
 
 createInertiaApp({
     resolve: (name) => {
