@@ -1,81 +1,75 @@
-import React, { useRef, useEffect } from "react";
+import React, { useEffect, useRef } from "react";
+import "trix";
+import "trix/dist/trix.css";
 
-// Komponen Pembungkus Trix Editor untuk integrasi React/Inertia
-export default function TrixEditor({
-    name,
-    value,
-    onChange,
-    placeholder = "",
-}) {
-    const trixRef = useRef(null);
+const TrixEditor = ({ value, onChange, name, ...rest }) => {
+    const trixEditor = useRef(null); // Ref untuk <trix-editor>
+    const trixInput = useRef(null); // <-- TAMBAHKAN REF BARU ini untuk <input>
 
-    // 1. Efek untuk menangani event perubahan (trix-change)
+    // Hook 1: Berjalan sekali saat Mount
+    // Ini untuk setup listener dan mengatur nilai awal
     useEffect(() => {
-        const editorElement = trixRef.current;
+        if (!trixEditor.current) return;
 
-        if (!editorElement) return;
-
-        // Fungsi yang akan dipanggil saat konten Trix berubah
-        const handleChange = () => {
-            // Ambil nilai (HTML) dari editorElement.value.
-            // Trix secara otomatis menyinkronkan kontennya ke value properti dari trix-editor element.
-            onChange(editorElement.value);
+        const handleChange = (event) => {
+            if (onChange) {
+                onChange(event.target.innerHTML);
+            }
         };
 
-        // Pasang listener saat konten berubah
-        editorElement.addEventListener("trix-change", handleChange);
+        trixEditor.current.addEventListener("trix-change", handleChange);
 
-        // Membersihkan event listener
-        return () => {
-            editorElement.removeEventListener("trix-change", handleChange);
-        };
-    }, [onChange]);
-
-    // 2. Efek untuk memuat nilai awal ke editor
-    useEffect(() => {
-        const editorElement = trixRef.current;
-
-        if (!editorElement) return;
-
-        // Handler untuk memastikan editor sudah siap sebelum memuat konten awal
-        const handleInitialize = () => {
-            // Memuat konten HTML ke Trix editor
-            // Kita hanya memuat initial value di sini (jika ada)
-            editorElement.editor.loadHTML(value || "");
-        };
-
-        // Pasang listener inisialisasi
-        editorElement.addEventListener("trix-initialize", handleInitialize);
-
-        // Jika komponen sudah ada dan Trix sudah terinisialisasi (misal update), panggil manual
-        if (editorElement.editor) {
-            editorElement.editor.loadHTML(value || "");
+        // Set nilai awal
+        if (trixEditor.current.editor) {
+            trixEditor.current.editor.loadHTML(value || "");
         }
 
         return () => {
-            editorElement.removeEventListener(
-                "trix-initialize",
-                handleInitialize
-            );
+            if (trixEditor.current) {
+                trixEditor.current.removeEventListener(
+                    "trix-change",
+                    handleChange
+                );
+            }
         };
-    }, [value]);
+    }, []); // <-- Tetap kosong, hanya berjalan sekali
+
+    // Hook 2: (BARU) Berjalan saat prop 'value' berubah
+    // Ini khusus untuk menangani reset form dari parent
+    useEffect(() => {
+        // Jika nilai di parent di-reset jadi kosong
+        if (value === "" || value === null) {
+            // 1. Kosongkan editor visual Trix
+            if (trixEditor.current && trixEditor.current.editor) {
+                trixEditor.current.editor.loadHTML(value || "");
+            }
+
+            // 2. Kosongkan juga <input type="hidden"> secara manual
+            //    Ini penting agar form submission berikutnya tidak mengirim data lama
+            if (trixInput.current) {
+                trixInput.current.value = "";
+            }
+        }
+    }, [value]); // <-- Hook ini bergantung pada [value]
 
     return (
-        <div>
-            {/* Input Hidden: Ini adalah input yang akan dikirim ke Laravel, dihubungkan ke trix-editor melalui atribut 'input' */}
-            <input type="hidden" id={name} name={name} value={value} />
-
-            {/* Custom Element Trix Editor */}
+        <div className="trix-editor-wrapper">
+            <input
+                ref={trixInput} // <-- PASANG REF DI SINI
+                id={rest.id || "trix-editor"}
+                type="hidden"
+                name={name || "content"}
+                // Tetap gunakan defaultValue agar "sticky bold" tidak rusak
+                defaultValue={value || ""}
+            />
             <trix-editor
-                id={`trix-${name}`}
-                ref={trixRef}
-                input={name} // Menghubungkan Trix ke input hidden di atas
-                placeholder={placeholder}
-                // Menambahkan kelas styling
-                className="trix-content min-h-32 border border-gray-200 dark:border-gray-800 rounded-md p-3 w-full shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                // ✨ FIX MASALAH BOLD/FORMAT HILANG SETELAH KARAKTER PERTAMA
-                data-disable-input-delay
+                ref={trixEditor}
+                input={rest.id || "trix-editor"}
+                {...rest}
+                className="trix-content"
             />
         </div>
     );
-}
+};
+
+export default TrixEditor;
